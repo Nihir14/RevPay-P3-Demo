@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 @FeignClient(name = "user-service")
 public interface UserClient {
-    @GetMapping("/api/v1/users/business-profile/{userId}")
+    @GetMapping("/api/v1/business/profile/user/{userId}")
     ApiResponse<BusinessProfileDto> getBusinessProfile(@PathVariable("userId") Long userId);
 
     @PostMapping("/api/v1/auth/verify-pin")
