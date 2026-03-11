@@ -56,9 +56,6 @@ services:
       - "8888:8888"
     environment:
       - CONFIG_REPO_PATH=/config-repo
-    volumes:
-      # Maps your local Windows config folder to the container
-      - "${USERPROFILE:-~}/Downloads/Er_diagram_of_revpay/sql qc/RevPay-P3/microservices/revpay-config:/config-repo"
     networks:
       - revpay-network
 
