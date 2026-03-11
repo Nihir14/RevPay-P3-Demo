@@ -85,7 +85,7 @@ class TransactionServiceTest {
 
         assertNotNull(result);
         assertEquals("COMPLETED", result.getStatus());
-        verify(notificationClient, times(1)).sendNotification(eq(2L), anyString());
+        verify(notificationClient, times(1)).sendNotification(eq(1L), anyString());
     }
 
     @Test

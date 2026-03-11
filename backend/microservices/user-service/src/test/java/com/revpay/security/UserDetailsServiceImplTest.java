@@ -1,5 +1,6 @@
 package com.revpay.security;
 
+import com.revpay.model.entity.Role;
 import com.revpay.model.entity.User;
 import com.revpay.repository.UserRepository;
 import org.junit.jupiter.api.Test;
@@ -31,6 +32,7 @@ class UserDetailsServiceImplTest {
         user.setUserId(1L);
         user.setEmail("test@example.com");
         user.setPasswordHash("hashed_password");
+        user.setRole(Role.PERSONAL);
 
         when(userRepository.findByEmail(anyString())).thenReturn(Optional.of(user));
 
