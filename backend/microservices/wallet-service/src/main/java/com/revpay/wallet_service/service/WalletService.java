@@ -29,10 +29,10 @@ public class WalletService {
     private final com.revpay.wallet_service.client.TransactionClient transactionClient;
     private final com.revpay.wallet_service.client.UserClient userClient;
 
-    public WalletService(WalletRepository walletRepository, 
-                        PaymentMethodRepository paymentMethodRepository,
-                        com.revpay.wallet_service.client.TransactionClient transactionClient,
-                        com.revpay.wallet_service.client.UserClient userClient) {
+    public WalletService(WalletRepository walletRepository,
+                         PaymentMethodRepository paymentMethodRepository,
+                         com.revpay.wallet_service.client.TransactionClient transactionClient,
+                         com.revpay.wallet_service.client.UserClient userClient) {
         super();
         this.walletRepository = walletRepository;
         this.paymentMethodRepository = paymentMethodRepository;
@@ -113,7 +113,7 @@ public class WalletService {
     public void creditFunds(Long userId, BigDecimal amount) {
         log.info("Crediting ₹{} to wallet of userId: {}", amount, userId);
         Wallet wallet = walletRepository.findByUserIdForUpdate(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Wallet not found for user: " + userId));
+                .orElseGet(() -> createWallet(userId));
 
         wallet.setBalance(wallet.getBalance().add(amount));
         walletRepository.save(wallet);

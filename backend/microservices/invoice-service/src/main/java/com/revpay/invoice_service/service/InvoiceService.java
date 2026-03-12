@@ -98,9 +98,9 @@ public class InvoiceService {
                 .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
 
         invoice.setTotalAmount(request.getTotalAmount() != null ? request.getTotalAmount() : calculatedTotal);
-        
+
         Invoice savedInvoice = invoiceRepository.save(invoice);
-        
+
         // Notify user
         try {
             notificationClient.sendNotification(userId, "New invoice created for " + request.getCustomerName() + " (Amount: ₹" + invoice.getTotalAmount() + ")");
@@ -129,7 +129,7 @@ public class InvoiceService {
     @Transactional
     public InvoiceDto payInvoice(Long userId, Long invoiceId, String pin) {
         log.info("User {} paying invoice {} with PIN", userId, invoiceId);
-        
+
         // 0. Verify PIN
         userClient.verifyPin(userId, new com.revpay.invoice_service.dto.VerifyPinRequest(pin));
 
@@ -140,29 +140,41 @@ public class InvoiceService {
             throw new RuntimeException("Invoice is not in SENT status");
         }
 
-        // 1. Debit user
+        // 1. Debit user (This happens in another service, so it commits immediately there)
         walletClient.debitFunds(userId, invoice.getTotalAmount());
 
-        // 2. Credit business
-        walletClient.creditFunds(invoice.getBusinessProfile().getUserId(), invoice.getTotalAmount());
-
-        // 3. Update status
-        invoice.setStatus(Invoice.InvoiceStatus.PAID);
-        
-        // 4. Record transaction
         try {
-            transactionClient.recordTransaction(userId, invoice.getTotalAmount(), "INVOICE_PAYMENT", 
-                "Invoice #" + invoiceId + " payment to " + invoice.getBusinessProfile().getBusinessName(),
-                invoice.getBusinessProfile().getUserId());
-        } catch (Exception te) {
-            log.warn("Failed to record transaction: {}", te.getMessage());
-        }
+            // 2. Credit business
+            walletClient.creditFunds(invoice.getBusinessProfile().getUserId(), invoice.getTotalAmount());
 
-        // 5. Notify business
-        try {
-            notificationClient.sendNotification(invoice.getBusinessProfile().getUserId(), "Invoice #" + invoiceId + " was paid by " + invoice.getCustomerName());
-        } catch (Exception ne) {
-            log.warn("Failed to notify business: {}", ne.getMessage());
+            // 3. Update status
+            invoice.setStatus(Invoice.InvoiceStatus.PAID);
+
+            // 4. Record transaction
+            try {
+                transactionClient.recordTransaction(userId, invoice.getTotalAmount(), "INVOICE_PAYMENT",
+                        "Invoice #" + invoiceId + " payment to " + invoice.getBusinessProfile().getBusinessName(),
+                        invoice.getBusinessProfile().getUserId());
+            } catch (Exception te) {
+                log.warn("Failed to record transaction: {}", te.getMessage());
+            }
+
+            // 5. Notify business
+            try {
+                notificationClient.sendNotification(invoice.getBusinessProfile().getUserId(), "Invoice #" + invoiceId + " was paid by " + invoice.getCustomerName());
+            } catch (Exception ne) {
+                log.warn("Failed to notify business: {}", ne.getMessage());
+            }
+        } catch (Exception e) {
+            log.error("Failed to complete invoice payment, initiating refund for user {}: {}", userId, e.getMessage());
+            // Compensating transaction to refund the debit if the credit fails
+            try {
+                walletClient.creditFunds(userId, invoice.getTotalAmount());
+                log.info("Refunded ₹{} to user {}", invoice.getTotalAmount(), userId);
+            } catch (Exception rollbackEx) {
+                log.error("CRITICAL: Failed to refund user {} after invoice payment failed! Amount: {}", userId, invoice.getTotalAmount(), rollbackEx);
+            }
+            throw new RuntimeException("Invoice payment failed during processing. Your account has been refunded. " + e.getMessage());
         }
 
         return mapToInvoiceDto(invoiceRepository.save(invoice));
